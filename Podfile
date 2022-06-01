@@ -7,7 +7,12 @@ target 'CarPlayV2' do
 
   # Pods for CarPlayV2
 pod 'RxSwift'
-	pod 'RxCocoa'
+pod 'RxCocoa'
 
+target 'CarPlayV2Tests' do
+  pod 'RxSwift'
+  pod 'RxCocoa'
+
+end
 
 end
