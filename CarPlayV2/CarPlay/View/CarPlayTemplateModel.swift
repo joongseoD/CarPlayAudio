@@ -14,8 +14,7 @@ protocol CarPlayTemplateModeling: AnyObject {
 }
 
 final class CarPlayTemplateModel: CarPlayTemplateModeling {
-    private let menuBuilderSubject = PublishSubject<Action.Push>()
-    private let playSubject = PublishSubject<Action.Play>()
+    private let action = PublishSubject<Action>()
     
     var provider: CarPlayProviding
     var mainScheduler: SchedulerType
@@ -38,40 +37,60 @@ final class CarPlayTemplateModel: CarPlayTemplateModeling {
     func transform(input: Input) -> Output {
         
         let playList = input.refresh
-            .flatMap {
-                return self.provider.playListMenu
+            .flatMap { [weak self] _ -> Observable<[CarPlayMenu]> in
+                guard let self = self else { return .empty() }
+                return self.request(scene: .playlistMenu)
             }
-            .listBuilder(header: .playlist, onTap: { menu in
-                guard let type = menu as? CarplayPlaylistMenu else { return }
-                self.menuBuilderSubject.onNext(.playlist(type: type))
+            .listBuilder(header: .playlist, onTap: { [weak self] model in
+                guard let type = model as? CarplayPlaylistMenu else { return }
+                self?.action.onNext(.push(.playList(type: type)))
             })
             
         let chartMenu = input.refresh
-            .flatMap {
-                return self.provider.chartMenu
+            .flatMap { [weak self] _ -> Observable<[CarPlayMenu]> in
+                guard let self = self else { return .empty() }
+                return self.request(scene: .chartMenu)
             }
-            .listBuilder(header: .chart, onTap: { menu in
-                self.menuBuilderSubject.onNext(.chart(id: menu.id))
+            .listBuilder(header: .chart, onTap: { [weak self] model in
+                self?.action.onNext(.push(.chart(id: model.id)))
             })
         
         let themeMenu = input.refresh
-            .flatMap {
-                return self.provider.themeList()
+            .flatMap { [weak self] _ -> Observable<[CarPlayMenu]> in
+                guard let self = self else { return .empty() }
+                return self.request(scene: .themeList)
             }
-            .listBuilder(header: .theme) { menu in
-                self.menuBuilderSubject.onNext(.themeDetail(id: menu.id))
+            .listBuilder(header: .theme) { [weak self] model in
+                self?.action.onNext(.push(.themeDetail(id: model.id)))
+            }
+        
+        let driveMenu = input.refresh
+            .flatMap { [weak self] _ -> Observable<[CarPlayMenu]> in
+                guard let self = self else { return .empty() }
+                return self.request(scene: .driveThemeList)
+            }
+            .listBuilder(header: .theme) { [weak self] model in
+                self?.action.onNext(.push(.driveDetail(id: model.id)))
             }
         
         let cabinetMenu = input.refresh
-            .flatMap {
-                return self.provider.cabinetMenu
+            .flatMap { [weak self] _ -> Observable<[CarPlayMenu]> in
+                guard let self = self else { return .empty() }
+                return self.request(scene: .cabinetMenu)
             }
-            .listBuilder(header: .cabinet) { menu in
-                guard let type = menu as? CabinetMenu else { return }
-                if type == .likeMusicList {
-                    self.playSubject.onNext(.likeMusicList(id: menu.id))
-                } else {
-                    self.menuBuilderSubject.onNext(.cabinet(type: type))
+            .listBuilder(header: .cabinet) { [weak self] model in
+                guard let type = model as? CabinetMenu else { return }
+                switch type {
+                case .myList:
+                    self?.action.onNext(.push(.myList(id: model.id)))
+                case .likeMusicList:
+                    self?.action.onNext(.play(.likeMusicList(id: model.id)))
+                case .likeAudioList:
+                    self?.action.onNext(.push(.myList(id: model.id)))
+                case .likeAlbum:
+                    self?.action.onNext(.push(.myList(id: model.id)))
+                case .likeThemeList:
+                    self?.action.onNext(.push(.myList(id: model.id)))
                 }
             }
             
@@ -79,50 +98,71 @@ final class CarPlayTemplateModel: CarPlayTemplateModeling {
             playList,
             chartMenu,
             themeMenu,
+            driveMenu,
             cabinetMenu,
-            resultSelector: { [$0, $1, $2, $3] }
+            resultSelector: { [$0, $1, $2, $3, $4] }
         )
             .observe(on: mainScheduler)
-
-        let push = menuBuilderSubject
-            .flatMap { menu -> Observable<CarPlayListModel> in
-                switch menu {
-                case let .playlist(type):
-                    return self.provider.playlist(type: type)
-                        .listBuilder(header: .playlist) { menu in
-                            self.playSubject.onNext(.track(id: menu.id))
+        
+        let push = action
+            .compactMap { action -> Action.CarPlayScene? in
+                guard case let .push(scene) = action else { return nil }
+                return scene
+            }
+            .flatMap { [weak self] scene -> Observable<CarPlayListModel> in
+                guard let self = self else { return .empty() }
+                let model = self.request(scene: scene)
+                switch scene {
+                case .playList:
+                    return model
+                        .listBuilder(header: .playlist) { model in
+                            self.action.onNext(.play(.track(id: model.id)))
                         }
-                case let .chart(id):
-                    return self.provider.chart(id: id)
-                        .listBuilder(header: .chart, onTap: { menu in
-                            self.playSubject.onNext(.track(id: menu.id))
+                case .chart:
+                    return model
+                        .listBuilder(header: .chart, onTap: { model in
+                            self.action.onNext(.play(.track(id: model.id)))
                         })
-                case let .themeDetail(id):
-                    return self.provider.themeDetail(id: id)
-                        .listBuilder(header: .playlist) { menu in
-                            self.playSubject.onNext(.track(id: menu.id))
+                case .themeDetail:
+                    return model
+                        .listBuilder(header: .playlist) { model in
+                            self.action.onNext(.play(.track(id: model.id)))
                         }
-                case let .cabinet(type):
-                    switch type {
-                    case .myList, .likeAlbum, .likeThemeList:
-                        return self.provider.myList(id: type.id)
-                            .listBuilder(header: .cabinet) { menu in
-                                // play
-                                // 한뎁스 더 들어갈 경우
-                                self.menuBuilderSubject.onNext(.cabinet(type: .likeAudioList))
-                            }
-                    case .likeAudioList:
-                        return self.provider.myList(id: type.id)
-                            .listBuilder(header: .cabinet) { menu in
-                                self.playSubject.onNext(.audio(id: menu.id))
-                            }
-                    case .likeMusicList:
-                        return .empty()
-                    }
+                case .driveDetail:
+                    return model
+                        .listBuilder(header: .pop) { model in
+                            self.action.onNext(.play(.track(id: model.id)))
+                        }
+                case .myList:
+                    return model
+                        .listBuilder(header: .cabinet) { model in
+                            self.action.onNext(.play(.track(id: model.id)))
+                        }
+                case .likeAudios:
+                    return model
+                        .listBuilder(header: .cabinet) { model in
+                            self.action.onNext(.play(.track(id: model.id)))
+                        }
+                case .likeAlbums:
+                    return model
+                        .listBuilder(header: .cabinet) { model in
+                            self.action.onNext(.play(.track(id: model.id)))
+                        }
+                case .likeThemeList:
+                    return model
+                        .listBuilder(header: .cabinet) { model in
+                            self.action.onNext(.play(.track(id: model.id)))
+                        }
+                default:
+                    return .empty()
                 }
             }
         
-        let play = playSubject
+        let play = action
+            .compactMap { action -> Action.CarPlayTrack? in
+                guard case let .play(track) = action else { return nil }
+                return track
+            }
             .flatMap { action -> Observable<String> in
                 switch action {
                 case let .likeMusicList(id):
@@ -133,25 +173,72 @@ final class CarPlayTemplateModel: CarPlayTemplateModeling {
                     return .just("트랙 재생 \(id)")
                 }
             }
-        
+
         return Output(
             tabBarModel: tabBarModel,
             push: push,
             play: play
         )
     }
+    
+    private func request(scene: Action.CarPlayScene) -> Observable<[CarPlayMenu]> {
+        switch scene {
+        case .playlistMenu:
+            return provider.playListMenu
+        case .chartMenu:
+            return provider.chartMenu
+        case .themeList:
+            return provider.themeList()
+        case .driveThemeList:
+            return provider.driveThemeList()
+        case .driveDetail(let id):
+            return provider.driveDetail(id: id)
+        case .cabinetMenu:
+            return provider.cabinetMenu
+        case .playList(let type):
+            return provider.playlist(type: type)
+        case .chart(let id):
+            return provider.chart(id: id)
+        case .themeDetail(let id):
+            return provider.themeDetail(id: id)
+        case .myList(let id):
+            return provider.myList(id: id)
+        case .likeAudios:
+            return provider.likeAudios()
+        case .likeAlbums:
+            return provider.likeAlbums()
+        case .likeThemeList:
+            return provider.likeThemeList()
+        }
+    }
 }
 
 extension CarPlayTemplateModel {
-    struct Action {
-        enum Push {
-            case playlist(type: CarplayPlaylistMenu)
+    enum Action {
+        case push(CarPlayScene)
+        case play(CarPlayTrack)
+        
+        enum CarPlayScene {
+            case playlistMenu
+            case chartMenu
+            case themeList
+            case driveThemeList
+            case cabinetMenu
+            case playList(type: CarplayPlaylistMenu)
             case chart(id: Int64)
             case themeDetail(id: Int64)
-            case cabinet(type: CabinetMenu)
+            case driveDetail(id: Int64)
+            case myList(id: Int64)
+            case likeAudios
+            case likeAlbums
+            case likeThemeList
+            
+            static var rootMenu: [CarPlayScene] {
+                return [.playlistMenu, chartMenu, themeList, cabinetMenu]
+            }
         }
-        
-        enum Play {
+
+        enum CarPlayTrack {
             case likeMusicList(id: Int64)
             case track(id: Int64)
             case audio(id: Int64)

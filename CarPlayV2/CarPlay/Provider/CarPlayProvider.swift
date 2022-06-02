@@ -29,7 +29,13 @@ protocol CarPlayProviding: AnyObject {
     
     func myList(id: Int64) -> Observable<[CarPlayMenu]>
     
-    //.....
+    func likeMusicIds() -> Observable<[String]>
+    
+    func likeAudios() -> Observable<[CarPlayMenu]>
+    
+    func likeAlbums() -> Observable<[CarPlayMenu]>
+    
+    func likeThemeList() -> Observable<[CarPlayMenu]>
 }
 
 final class CarPlayProvider: CarPlayProviding {
@@ -95,6 +101,34 @@ final class CarPlayProvider: CarPlayProviding {
     }
     
     func myList(id: Int64) -> Observable<[CarPlayMenu]> {
+        return .just([
+            CarPlayMenuModel(id: 1, title: "힙합1"),
+            CarPlayMenuModel(id: 1, title: "힙합2"),
+            CarPlayMenuModel(id: 1, title: "힙합3"),
+        ])
+    }
+    
+    func likeMusicIds() -> Observable<[String]> {
+        return .just(["1", "2", "3"])
+    }
+    
+    func likeAudios() -> Observable<[CarPlayMenu]> {
+        return .just([
+            CarPlayMenuModel(id: 1, title: "힙합1"),
+            CarPlayMenuModel(id: 1, title: "힙합2"),
+            CarPlayMenuModel(id: 1, title: "힙합3"),
+        ])
+    }
+    
+    func likeAlbums() -> Observable<[CarPlayMenu]> {
+        return .just([
+            CarPlayMenuModel(id: 1, title: "힙합1"),
+            CarPlayMenuModel(id: 1, title: "힙합2"),
+            CarPlayMenuModel(id: 1, title: "힙합3"),
+        ])
+    }
+    
+    func likeThemeList() -> Observable<[CarPlayMenu]>{
         return .just([
             CarPlayMenuModel(id: 1, title: "힙합1"),
             CarPlayMenuModel(id: 1, title: "힙합2"),

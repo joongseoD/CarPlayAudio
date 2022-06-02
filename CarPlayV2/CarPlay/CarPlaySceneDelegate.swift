@@ -13,6 +13,7 @@ final class CarPlaySceneDelegate: NSObject, CPTemplateApplicationSceneDelegate {
     private let templateManager = CarPlayTemplateManager(model: CarPlayTemplateModel())
     
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
+        print("## will connect")
     }
     
     func templateApplicationScene(_ templateApplicationScene: CPTemplateApplicationScene, didConnect interfaceController: CPInterfaceController) {
@@ -27,7 +28,9 @@ final class CarPlaySceneDelegate: NSObject, CPTemplateApplicationSceneDelegate {
 
 @available(iOS 14.0, *)
 extension CarPlaySceneDelegate {
-    func sceneDidDisconnect(_ scene: UIScene) { }
+    func sceneDidDisconnect(_ scene: UIScene) {
+        print("## did disconnect")
+    }
     
     func sceneDidBecomeActive(_ scene: UIScene) { }
     

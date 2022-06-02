@@ -73,12 +73,5 @@ struct CarPlayListItemModel {
     var detailText: String?
     var image: UIImage?
     var imageUrl: String?
-    var type: ItemType?
-    
-    enum ItemType {
-        case menu
-        case button
-    }
-    
     var didTapItem: (() -> Void)?
 }

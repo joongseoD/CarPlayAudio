@@ -44,7 +44,6 @@ extension ObservableType where Element == [CarPlayMenu] {
                         detailText: nil,
                         image: nil,
                         imageUrl: nil,
-                        type: .menu,
                         didTapItem: { handler?(menu) }
                     )
                 }
@@ -52,7 +51,7 @@ extension ObservableType where Element == [CarPlayMenu] {
         }
     }
     
-    func listBuilder(header: CarPlayListModel.Header, onTap handler: ((_ menu: CarPlayMenu) -> Void)?) -> Observable<CarPlayListModel> {
+    func listBuilder(header: CarPlayListModel.Header, onTap handler: ((_ model: CarPlayMenu) -> Void)?) -> Observable<CarPlayListModel> {
         return sectionBuilder(onTap: handler)
             .map { CarPlayListModel(header: header, sections: [$0]) }
     }
