@@ -98,7 +98,7 @@ final class CarPlayTemplateModel {
                 case .likeMusicList:
                     self?.action.onNext(.play(.likeMusicList(id: model.id)))
                 case .likeAudioList:
-                    self?.action.onNext(.push(.myList(id: model.id)))
+                    self?.action.onNext(.push(.likeAudios))
                 case .likeAlbum:
                     self?.action.onNext(.push(.myList(id: model.id)))
                 case .likeThemeList:
