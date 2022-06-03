@@ -9,19 +9,31 @@ import UIKit
 import RxSwift
 import RxCocoa
 
-protocol CarPlayTemplateModeling: AnyObject {
+protocol CarPlayTemplateModelDependency {
     var provider: CarPlayProviding { get }
+    var mainScheduler: SchedulerType { get }
+    var maximumTabCount: Int { get }
+    var maximumItemCount: Int { get }
+    var maximumSectionCount: Int { get }
 }
 
-final class CarPlayTemplateModel: CarPlayTemplateModeling {
+final class CarPlayTemplateModel {
     private let action = PublishSubject<Action>()
+    private let provider: CarPlayProviding
+    private let mainScheduler: SchedulerType
     
-    var provider: CarPlayProviding
-    var mainScheduler: SchedulerType
+    // TODO: - List Paging
+    // TODO: - Tab count 5이하만 가능한 경우 어떻게 할지
+    private let maximumTabCount: Int
+    private let maximumItemCount: Int
+    private let maximumSectionCount: Int
     
-    init(provider: CarPlayProviding = CarPlayProvider(), mainScheduler: SchedulerType = MainScheduler.instance) {
-        self.provider = provider
-        self.mainScheduler = mainScheduler
+    init(dependency: CarPlayTemplateModelDependency) {
+        self.provider = dependency.provider
+        self.mainScheduler = dependency.mainScheduler
+        self.maximumTabCount = dependency.maximumTabCount
+        self.maximumItemCount = dependency.maximumItemCount
+        self.maximumSectionCount = dependency.maximumSectionCount
     }
     
     struct Input {
@@ -98,9 +110,9 @@ final class CarPlayTemplateModel: CarPlayTemplateModeling {
             playList,
             chartMenu,
             themeMenu,
-            driveMenu,
+//            driveMenu,
             cabinetMenu,
-            resultSelector: { [$0, $1, $2, $3, $4] }
+            resultSelector: { [$0, $1, $2, $3] }
         )
             .observe(on: mainScheduler)
         
@@ -157,6 +169,7 @@ final class CarPlayTemplateModel: CarPlayTemplateModeling {
                     return .empty()
                 }
             }
+            .observe(on: mainScheduler)
         
         let play = action
             .compactMap { action -> Action.CarPlayTrack? in
@@ -173,6 +186,7 @@ final class CarPlayTemplateModel: CarPlayTemplateModeling {
                     return .just("트랙 재생 \(id)")
                 }
             }
+            .observe(on: mainScheduler)
 
         return Output(
             tabBarModel: tabBarModel,

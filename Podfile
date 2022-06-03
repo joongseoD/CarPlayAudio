@@ -12,7 +12,9 @@ pod 'RxCocoa'
 target 'CarPlayV2Tests' do
   pod 'RxSwift'
   pod 'RxCocoa'
-
+  pod 'RxTest'
+  pod 'RxBlocking'
+  
 end
 
 end

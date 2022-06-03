@@ -18,11 +18,16 @@ final class CarPlayTemplateManager: NSObject {
     private let model: CarPlayTemplateModel
     private var bag = DisposeBag()
     private var rootTemplate = CPTabBarTemplate(templates: [])
-    private weak var controller: CPInterfaceController?
+    private weak var interfaceController: CPInterfaceController?
+    
+    /// The observer of the Now Playing item changes.
+    var nowPlayingItemObserver: NSObjectProtocol?
+    
+    /// The observer of the playback state changes.
+    var playbackObserver: NSObjectProtocol?
     
     private lazy var configureListItem: ConfigureListItem = {
         return { section, itemModel in
-            print("## configure")
             let item = CPListItem(
                 text: itemModel.text,
                 detailText: itemModel.detailText,
@@ -32,9 +37,6 @@ final class CarPlayTemplateManager: NSObject {
             item.handler = { [weak self] _, completion in
                 itemModel.didTapItem?()
                 completion()
-            }
-            section.control?.headerButtonHandler = {
-                print("## ", $0)
             }
             return item
         }
@@ -55,11 +57,35 @@ final class CarPlayTemplateManager: NSObject {
     }
     
     func connect(_ interfaceController: CPInterfaceController) {
-        self.controller = interfaceController
+        self.interfaceController = interfaceController
+        self.interfaceController?.delegate = self
 
-        interfaceController.setRootTemplate(rootTemplate, animated: true, completion: nil)
-        
+        setupTemplate()
+        addObservers()
         bind()
+    }
+    
+    private func setupTemplate() {
+        interfaceController?.setRootTemplate(rootTemplate, animated: true, completion: nil)
+    }
+    
+    private func addObservers() {
+        CPNowPlayingTemplate.shared.add(self)
+        playbackObserver = NotificationCenter.default.addObserver(
+            forName: .MPMusicPlayerControllerPlaybackStateDidChange,
+            object: nil,
+            queue: .main
+        ) { notification in
+            print("## Playback state changed", notification)
+        }
+        
+        nowPlayingItemObserver = NotificationCenter.default.addObserver(
+            forName: .MPMusicPlayerControllerNowPlayingItemDidChange,
+            object: nil,
+            queue: .main
+        ) { notification in
+            print("## NowPlayingItem changed", notification)
+        }
     }
     
     private func bind() {
@@ -76,14 +102,51 @@ final class CarPlayTemplateManager: NSObject {
         output.push
             .mapToListTemplate(configure: configureListItem)
             .subscribe(onNext: { [weak self] templateToPush in
-                self?.controller?.pushTemplate(templateToPush, animated: true, completion: nil)
+                self?.interfaceController?.pushTemplate(templateToPush, animated: true, completion: nil)
             })
             .disposed(by: bag)
         
         output.play
-            .subscribe(onNext: {
-                print("## ", $0)
+            .subscribe(onNext: { _ in
+                // 재생 후 UI 처리
             })
             .disposed(by: bag)
+    }
+    
+    func disconnect() {
+        nowPlayingItemObserver = nil
+        playbackObserver = nil
+        MPMusicPlayerController.applicationQueuePlayer.pause()
+    }
+}
+
+extension CarPlayTemplateManager: CPInterfaceControllerDelegate {
+    func templateWillAppear(_ aTemplate: CPTemplate, animated: Bool) {
+        print("\(aTemplate) wiilAppear")
+    }
+    
+    func templateDidAppear(_ aTemplate: CPTemplate, animated: Bool) {
+        print("\(aTemplate) didAppear")
+    }
+    
+    func templateWillDisappear(_ aTemplate: CPTemplate, animated: Bool) {
+        print("\(aTemplate) templateWillDisappear")
+    }
+    
+    func templateDidDisappear(_ aTemplate: CPTemplate, animated: Bool) {
+        print("\(aTemplate) templateDidDisappear")
+    }
+}
+
+extension CarPlayTemplateManager: CPNowPlayingTemplateObserver {
+    func nowPlayingTemplateUpNextButtonTapped(_ nowPlayingTemplate: CPNowPlayingTemplate) {
+//        The user has selected the Up Next button on the now playing template. Your application
+//        should push a new template displaying the list of upcoming or queued content.
+    }
+    
+    func nowPlayingTemplateAlbumArtistButtonTapped(_ nowPlayingTemplate: CPNowPlayingTemplate) {
+//        let _ = MPMusicPlayerController.applicationQueuePlayer.nowPlayingItem?.albumArtist
+//        The user has selected the album/artist button on the now playing template. Your application
+//        should push a new template displaying the content appearing in this container (album, playlist, or show).
     }
 }
